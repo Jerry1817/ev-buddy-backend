@@ -6,6 +6,8 @@ const Station = require("../models/Station");
    ====================================================== */
 exports.sendRequest = async (req, res) => {
   try {
+    console.log("lllllllllllllllll");
+    
     const { stationId } = req.body;
     const userId = req.user.id;
 
@@ -15,6 +17,8 @@ exports.sendRequest = async (req, res) => {
 
     // Find station
     const station = await Station.findById(stationId);
+    console.log(station,"kkkkkkkkkkkkkkk");
+    
     if (!station) {
       return res.status(404).json({ message: "Station not found" });
     }

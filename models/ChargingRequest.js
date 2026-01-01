@@ -16,7 +16,7 @@ const chargingRequestSchema = new mongoose.Schema(
 
     hostId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "users",
       required: true,
     },
 

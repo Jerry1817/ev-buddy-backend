@@ -1,9 +1,10 @@
 const express = require("express");
 const router = express.Router();
 
-const { registerHost } = require("../controllers/hostController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { registerStation } = require("../controllers/hostController");
 
-router.post("/register", authMiddleware, registerHost);
+// 🔥 THIS MUST BE A FUNCTION
+router.post("/register", authMiddleware, registerStation);
 
 module.exports = router;

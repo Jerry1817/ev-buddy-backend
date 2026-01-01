@@ -1,38 +1,62 @@
 const Station = require("../models/Station");
 
-exports.registerHost = async (req, res) => {
+/**
+ * HOST → REGISTER STATION
+ */
+const registerStation = async (req, res) => {
   try {
-    if (req.user.role !== "host") {
-      return res.status(403).json({ message: "Not a host" });
+    if (!req.user || req.user.role !== "host") {
+      return res.status(403).json({ message: "Only hosts can register stations" });
     }
 
     const {
       stationName,
-      phone,
-      address,
+      totalChargers,
       power,
       rate,
-      totalChargers,
+      address,
+      location,
     } = req.body;
 
-    if (!stationName || !totalChargers) {
+    if (
+      !stationName ||
+      !totalChargers ||
+      !power ||
+      !rate ||
+      !address ||
+      !location ||
+      location.lat === undefined ||
+      location.lng === undefined
+    ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const station = await Station.create({
-      name: stationName,
-      phone,
-      address,
-      power,
-      rate,
+      stationName,
       totalChargers,
       chargersAvailable: totalChargers,
-      hostId: req.user.id,
+      power,
+      rate,
+      address,
+      location: {
+        lat: Number(location.lat),
+        lng: Number(location.lng),
+      },
+      host: req.user._id,
     });
 
-    res.status(201).json({ message: "Station registered", station });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Host registration failed" });
+    console.log("✅ Station saved:", station._id);
+
+    res.status(201).json({
+      message: "Station registered successfully",
+      station,
+    });
+  } catch (error) {
+    console.error("❌ Station register error:", error);
+    res.status(500).json({ message: "Station registration failed" });
   }
+};
+
+module.exports = {
+  registerStation,
 };

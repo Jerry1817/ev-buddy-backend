@@ -1,51 +1,48 @@
-const Station = require("../models/Station");
+const mongoose = require("mongoose");
 
-exports.registerHost = async (req, res) => {
-  try {
-    const {
-      stationName,
-      email,
-      phone,
-      address,
-      power,
-      rate,
-      totalChargers,
-      type, // Public / Private
-    } = req.body;
+const stationSchema = new mongoose.Schema(
+  {
+    stationName: {
+      type: String,
+      required: true,
+    },
+    totalChargers: {
+      type: Number,
+      required: true,
+    },
+    chargersAvailable: {
+      type: Number,
+      default: 0,
+    },
+    power: {
+      type: Number,
+      required: true,
+    },
+    rate: {
+      type: Number,
+      required: true,
+    },
+    address: {
+      type: String,
+      required: true,
+    },
+    location: {
+      lat: {
+        type: Number,
+        required: true,
+      },
+      lng: {
+        type: Number,
+        required: true,
+      },
+    },
+    hostId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "users",
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
 
-    // 🔒 BASIC VALIDATION
-    if (!stationName || !address || !totalChargers || !power) {
-      return res.status(400).json({
-        message: "Required fields missing",
-      });
-    }
-
-    // 🔑 Logged-in host id from token
-    const hostId = req.user.id;
-
-    // 🏭 CREATE STATION
-    const station = await Station.create({
-      name: stationName,          // 🔁 match DB field
-      email,
-      phone,
-      address,
-      power,
-      rate,
-      totalChargers,
-      chargersAvailable: totalChargers,
-      type: type || "Public",
-      status: "Offline",          // default
-      hostId,
-    });
-
-    return res.status(201).json({
-      message: "Host station registered successfully",
-      station,
-    });
-  } catch (error) {
-    console.error("Host Register Error:", error);
-    return res.status(500).json({
-      message: "Host registration failed",
-    });
-  }
-};
+module.exports = mongoose.model("Station", stationSchema);
