@@ -1,34 +1,63 @@
-const mongoose = require("mongoose");
+const bcrypt=require('bcrypt')
+const mongoose=require('mongoose')
 
 const userSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: true,
-    },
+    name: { type: String, required: true },
+
     email: {
       type: String,
+      required: true,
       unique: true,
-      required: true,
+      // lowercase: true,
     },
-    phone: {
-      type: String,
-      required: true,
-    },
+
     password: {
       type: String,
       required: true,
+      // minlength: 6,
     },
-    evModel: {
+
+    roles: {
       type: String,
+      enum: ["DRIVER", "HOST"],
+      default: "DRIVER",
     },
-    role: {
-      type: String,
-      enum: ["user", "host"],
-      default: "user",
+
+    location: { 
+      type :{
+        type: String,
+        enum:["Point"],
+        default: "Point",
+      },
+        coordinates:{
+          type :[Number]
+        },
     },
+    isHostActive: {
+      type: Boolean,
+      default: false,
+    },
+     evStation: {
+      name: String,
+      address: String,
+      availableChargers: Number,
+    },
+
+    chargingPricePerUnit: Number,
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("User", userSchema);
+userSchema.pre("save", async function () {
+  if (!this.isModified("password")) return;
+  this.password = await bcrypt.hash(this.password, 10);
+});
+
+userSchema.methods.comparePassword = function (password) {
+  return bcrypt.compare(password, this.password);
+};
+
+userSchema.index({ location: "2dsphere" });
+module .exports=mongoose.model("User", userSchema);
+

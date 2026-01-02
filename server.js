@@ -5,10 +5,19 @@ require("dotenv").config();
 const connectDB = require("./config/db");
 const stationRoutes = require("./routes/stationRoutes");
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin:"http://localhost:5000",
+  credentials: true,
+}));
+
 app.use(express.json());
 
 connectDB();
+
+app.get('/', (req, res) => {
+  res.send('EV Buddy Backend is running');
+});
 
 // ROUTES
 app.use("/api/stations", stationRoutes);
