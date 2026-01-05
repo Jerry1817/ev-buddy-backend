@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const { getAllStations } = require("../controllers/stationController");
+const { getAllStations, getNearbyStations } = require("../controllers/stationController");
 
-router.get("/", getAllStations);
+router.get("/nearbystations", getNearbyStations);
 
 module.exports = router;

@@ -68,21 +68,21 @@ exports.getProfile = async (req, res) => {
 
 
 exports.becomeHost = async (req, res) => {
-  const { stationName, address, availableChargers, location } = req.body;
-  console.log(location,"ll");
+  const { stationName, address, availableChargers, longitude,latitude } = req.body;
+  console.log(latitude,"ll");
   
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.roles = "HOST";
-    user.isHost = true;
+    user.isHostActive = true;
     user.evStation = { name: stationName, address, availableChargers };
       user.location = {
       type: "Point",
       coordinates: [
-        Number(location.lng),
-        Number(location.lat),
+        Number(latitude),
+        Number(longitude),
       ],
     };
 

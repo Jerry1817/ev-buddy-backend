@@ -24,16 +24,19 @@ const userSchema = new mongoose.Schema(
       default: "DRIVER",
     },
 
-    location: { 
-      type :{
-        type: String,
-        enum:["Point"],
-        default: "Point",
-      },
-        coordinates:{
-          type :[Number]
-        },
-    },
+   location: {
+  type: {
+    type: String,
+    enum: ["Point"],
+    // required: true,
+    default: "Point",
+  },
+  coordinates: {
+    type: [Number], // [longitude, latitude]
+    // required: true,
+  },
+},
+
     isHostActive: {
       type: Boolean,
       default: false,

@@ -11,11 +11,11 @@ const {
 } = require("../controllers/chargingRequestController");
 
 // USER
-router.post("/send", authMiddleware, sendRequest);
+// router.post("/send", authMiddleware, sendRequest);
 
-// HOST
-router.get("/host", authMiddleware, getHostRequests);
-router.put("/accept/:requestId", authMiddleware, acceptRequest);
-router.put("/reject/:requestId", authMiddleware, rejectRequest);
+// // HOST
+// router.get("/host", authMiddleware, getHostRequests);
+// router.put("/accept/:requestId", authMiddleware, acceptRequest);
+// router.put("/reject/:requestId", authMiddleware, rejectRequest);
 
 module.exports = router;

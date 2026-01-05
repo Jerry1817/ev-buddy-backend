@@ -1,12 +1,42 @@
 const Station = require("../models/Station");
+const User = require("../models/User");
 
-exports.getAllStations = async (req, res) => {
-  try {
-    const stations = await Station.find().sort({ createdAt: -1 });
+exports.getNearbyStations = async (req, res) => {
+  const { latitude, longitude, distance = 5000 } = req.query;  
 
-    res.status(200).json(stations);
-  } catch (error) {
-    console.error("GET STATIONS ERROR:", error);
-    res.status(500).json({ message: "Failed to fetch stations" });
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  const maxDistance = Number(distance);
+
+  if (!lat || !lng) {
+    return res.status(400).json({
+      success: false,
+      message: "Latitude and longitude are required",
+    });
   }
+
+  const stations = await User.find({
+    isHostActive: true,
+    location: {
+      $near: {
+        $geometry: {
+          type: "Point",
+          coordinates: [lng, lat],
+        },
+        $maxDistance: maxDistance,
+      },
+    },
+  })  
+
+  // if(stations==null){
+  //   res.json({message:"no stations found",success:false})
+  // }
+
+  res.json({
+    success: true,
+    count: stations.length,
+    data: stations,
+  });
 };
+
+
