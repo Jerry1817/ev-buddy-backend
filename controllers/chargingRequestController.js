@@ -1,38 +1,39 @@
 const ChargingRequest = require("../models/ChargingRequest");
-const Station = require("../models/Station");
+const User = require("../models/User");
 
 /* ======================================================
    USER → Send charging request
    ====================================================== */
+
 exports.sendRequest = async (req, res) => {
   try {
     console.log("lllllllllllllllll");
     
-    const { stationId } = req.body;
-    const userId = req.user.id;
+    const { hostid } = req.body;
+    const driverId = req.user.id;
 
-    if (!stationId) {
-      return res.status(400).json({ message: "Station ID required" });
+    if (!driverId) {
+      return res.status(400).json({ message: "driverId ID required" });
     }
 
     // Find station
-    const station = await Station.findById(stationId);
-    console.log(station,"kkkkkkkkkkkkkkk");
+    const host = await User.findById(hostid);
+    console.log(host,"kkkkkkkkkkkkkkk");
     
-    if (!station) {
-      return res.status(404).json({ message: "Station not found" });
+    if (!host) {
+      return res.status(404).json({ message: "host not found" });
     }
 
-    if (!station.hostId) {
+    if (!host._id) {
       return res
         .status(400)
-        .json({ message: "Station host not configured" });
+        .json({ message: " host not configured" });
     }
 
     // Prevent duplicate pending requests
     const existing = await ChargingRequest.findOne({
-      userId,
-      stationId,
+      driverId,
+      hostid,
       status: "pending",
     });
 
@@ -44,15 +45,14 @@ exports.sendRequest = async (req, res) => {
 
     // Create request
     const request = await ChargingRequest.create({
-      userId,
-      stationId,
-      hostId: station.hostId,
+     driver: driverId,
+     host: hostid,
       status: "pending",
     });
 
     res.status(201).json({
       message: "Request sent successfully",
-      request,
+     data:request,
     });
   } catch (error) {
     console.error("Send request error:", error);
@@ -89,7 +89,7 @@ exports.acceptRequest = async (req, res) => {
 
     const request = await ChargingRequest.findOne({
       _id: requestId,
-      hostId,
+      host:hostId,
     });
 
     if (!request) {
@@ -119,7 +119,7 @@ exports.rejectRequest = async (req, res) => {
 
     const request = await ChargingRequest.findOne({
       _id: requestId,
-      hostId,
+      host:hostId,
     });
 
     if (!request) {

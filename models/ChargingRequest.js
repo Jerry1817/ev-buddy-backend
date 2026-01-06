@@ -2,21 +2,15 @@ const mongoose = require("mongoose");
 
 const chargingRequestSchema = new mongoose.Schema(
   {
-    userId: {
+    driver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
 
-    stationId: {
+    host: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Station",
-      required: true,
-    },
-
-    hostId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "users",
+      ref: "User",
       required: true,
     },
 
@@ -24,6 +18,10 @@ const chargingRequestSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "accepted", "rejected"],
       default: "pending",
+    },
+      requestedAt: {
+      type: Date,
+      default: Date.now,
     },
   },
   { timestamps: true }
