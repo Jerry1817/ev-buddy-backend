@@ -76,7 +76,7 @@ exports.getProfile = async (req, res) => {
 
 
 exports.becomeHost = async (req, res) => {
-  const { stationName, address, availableChargers, longitude,latitude } = req.body;
+  const { stationName, address, availableChargers,chargingPricePerUnit, longitude,latitude } = req.body;
   console.log(latitude,"ll");
   
   try {
@@ -85,7 +85,7 @@ exports.becomeHost = async (req, res) => {
 
     user.roles = "HOST";
     user.isHostActive = true;
-    user.evStation = { name: stationName, address, availableChargers };
+    user.evStation = { name: stationName, address, availableChargers,chargingPricePerUnit };
       user.location = {
       type: "Point",
       coordinates: [
@@ -110,6 +110,8 @@ exports.becomeHost = async (req, res) => {
 
 exports.AddLocation = async (req, res) => {
   try {
+    console.log("hiihi");
+  
     const { latitude, longitude } = req.body;
 
     if (!latitude || !longitude) {
@@ -215,5 +217,114 @@ exports.verifyPayment = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Payment verification failed" });
+  }
+};
+
+
+exports.startSessioncharging = async (req, res) => {
+  try {
+
+//     if (req.user.id.toString() !== request.host.toString()) {
+//   return res.status(403).json({ message: "Only host can start session" });
+// }
+
+    const { requestId } = req.body;
+
+    const request = await ChargingRequest.findById(requestId);
+    if (!request || request.status !== "accepted") {
+      return res.status(400).json({ message: "Invalid request" });
+    }
+
+    const session = await ChargingSession.create({
+      request: request._id,
+      driver: request.driver,
+      host: request.host,
+      startTime: new Date(),
+      status: "STARTED",
+    });
+
+    res.json({
+      success: true,
+      message: "Charging session started",
+      data: session,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+exports.endSession = async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    const session = await ChargingSession.findById(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    if (session.status !== "STARTED") {
+      return res.status(400).json({ message: "Session already completed" });
+    }
+
+    session.endTime = new Date();
+
+    // Duration in minutes
+    const durationMs = session.endTime - session.startTime;
+    const durationInMinutes = Math.ceil(durationMs / (1000 * 60));
+
+    const host = await User.findById(session.host);
+
+    const pricePerMinute = host.chargingPricePerUnit || 5;
+    const totalCost = durationInMinutes * pricePerMinute;
+
+    session.durationInMinutes = durationInMinutes;
+    session.totalCost = totalCost;
+    session.status = "COMPLETED";
+
+    await session.save();
+
+  
+
+    res.status(200).json({
+      success: true,
+      message: "Charging session ended",
+      data: {
+        sessionId: session._id,
+        durationInMinutes,
+        totalCost,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.createOrder = async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    const session = await ChargingSession.findById(sessionId);
+    if (!session || session.status !== "COMPLETED") {
+      return res.status(400).json({ message: "Invalid session" });
+    }
+
+    const order = await razorpay.orders.create({
+      amount: session.totalCost * 100, // paise
+      currency: "INR",
+      receipt: `session_${session._id}`,
+    });
+
+    res.status(200).json({
+      success: true,
+      order,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 };

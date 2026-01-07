@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema(
       name: String,
       address: String,
       availableChargers: Number,
+      chargingPricePerUnit:Number,
+      power:Number,
+      connectorType:String,
+      description:String,
     },
 
     chargingPricePerUnit: Number,
