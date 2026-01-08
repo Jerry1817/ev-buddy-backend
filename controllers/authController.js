@@ -3,7 +3,9 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const ChargingRequest = require("../models/ChargingRequest");
 const crypto = require("crypto");
+const razorpay = require("../config/razorpay");
 const ChargingSession = require("../models/ChargingSession");
+
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -307,21 +309,35 @@ exports.endSession = async (req, res) => {
 exports.createOrder = async (req, res) => {
   try {
     const { sessionId } = req.body;
+    console.log(sessionId,);
 
+  const user = await User.findById(req.user.id);
+    
     const session = await ChargingSession.findById(sessionId);
     if (!session || session.status !== "COMPLETED") {
       return res.status(400).json({ message: "Invalid session" });
     }
 
+    const hostid=session.host
+
+    const host=await User.findById({_id:hostid})
+
+    
     const order = await razorpay.orders.create({
       amount: session.totalCost * 100, // paise
       currency: "INR",
       receipt: `session_${session._id}`,
     });
+    
+    session.paymentStatus="PAID"
+    await session.save()
 
     res.status(200).json({
       success: true,
       order,
+      session,
+      host,
+      user
     });
   } catch (err) {
     console.error(err);
