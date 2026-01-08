@@ -1,8 +1,9 @@
 const express = require("express");
 const {protect}=require('../middleware/authMiddleware')
-const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, verifyPayment, startSessioncharging, endSession, createOrder } = require("../controllers/authController");
+const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats } = require("../controllers/authController");
 const router = express.Router();
 
+router.get("/homestats", protect, getDashboardStats);
 router.post("/register", register);
 router.post("/login", login);
 router.get("/profile", protect, getProfile);
