@@ -30,7 +30,8 @@ exports.register = async (req, res, next) => {
 ========================= */
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password ,phone} = req.body;
+    
     const user = await User.findOne({ email });
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
@@ -38,15 +39,19 @@ exports.login = async (req, res, next) => {
         message: "Invalid email or password",
       });
     }
-
+      user.phone=phone
+      await user.save()
+      
   res.json({
   success: true,
   token: generateToken(user._id),
   role: user.roles.includes("HOST") ? "HOST" : "DRIVER",
+  message:"user logged in successfully",
   data: {
     id: user._id,
     name: user.name,
-    email: user.email
+    email: user.email,
+    phone:user.phone
   }
 });
 
@@ -79,7 +84,6 @@ exports.getProfile = async (req, res) => {
 
 exports.becomeHost = async (req, res) => {
   const { stationName, address, availableChargers,chargingPricePerUnit, longitude,latitude } = req.body;
-  console.log(latitude,"ll");
   
   try {
     const user = await User.findById(req.user.id);
@@ -112,7 +116,6 @@ exports.becomeHost = async (req, res) => {
 
 exports.AddLocation = async (req, res) => {
   try {
-    console.log("hiihi");
   
     const { latitude, longitude } = req.body;
 
@@ -161,7 +164,7 @@ const isExpired = (createdAt) => {
   return diff > AUTO_CANCEL_MINUTES;
 };
 
-
+// userside
 exports.getMyChargingRequests = async (req, res) => {
   try {
     const requests = await ChargingRequest.find({

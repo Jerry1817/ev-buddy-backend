@@ -1,14 +1,9 @@
 const Station = require("../models/Station");
 const ChargingRequest = require("../models/ChargingRequest");
-const Razorpay = require("razorpay");
 const Chargingsession = require("../models/ChargingSession");
 
 
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
 /**
  * HOST → REGISTER STATION
  */
@@ -70,22 +65,25 @@ const registerStation = async (req, res) => {
 // host view
 exports.viewallrequests = async (req, res) => {
   try {
+    console.log("ooooooooooooooooooooooooooooooooooooooo")
     const hostId = req.user.id;
-    console.log(hostId,"695cb3a7a2049d10fee89c4c");
+    console.log(hostId,"sssssssss");
     
 
     const requests = await ChargingRequest.find({
       host: hostId,
-      status: "pending",
     })
-      .populate("host","name email")
+      .populate("driver","name email phone location")
       .populate("host", "name email evStation")
       .sort({ createdAt: -1 });
 
-    res.json({
+      console.log(requests,"lllllllll");
+      
+
+    res.status(200).json({
       success: true,
       count: requests.length,
-      data: requests,
+       requests,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

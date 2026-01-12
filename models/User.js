@@ -17,6 +17,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       // minlength: 6,
     },
+    phone:{
+      type:Number,
+      unique:true,
+    },
 
     roles: {
       type: String,
@@ -50,7 +54,6 @@ const userSchema = new mongoose.Schema(
       connectorType:String,
       description:String,
     },
-
     chargingPricePerUnit: Number,
   },
   { timestamps: true }

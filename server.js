@@ -27,7 +27,7 @@ app.use("/api/charging", require("./routes/chargingRoutes"));
 app.use("/api/payment", require("./routes/paymentRoutes"));
 app.use("/api/stations", require("./routes/stationRoutes"));
 app.use(
-  "/api/charging-request",
+  "/api/chargingrequest",
   require("./routes/chargingRequestRoutes")
 );
 

@@ -66,7 +66,6 @@ exports.sendRequest = async (req, res) => {
 exports.getHostRequests = async (req, res) => {
   try {
     const hostId = req.user.id;
-
     const requests = await ChargingRequest.find({ hostId })
       .populate("userId", "name email phone")
       .populate("stationId", "name address power")
@@ -86,6 +85,9 @@ exports.acceptRequest = async (req, res) => {
   try {
     const hostId = req.user.id;
     const { requestId } = req.params;
+
+    console.log(hostId,requestId,"ooo");
+    
 
     const request = await ChargingRequest.findOne({
       _id: requestId,
@@ -113,9 +115,15 @@ exports.acceptRequest = async (req, res) => {
    HOST → Reject request
    ====================================================== */
 exports.rejectRequest = async (req, res) => {
+  console.log("ok");
+  
   try {
     const hostId = req.user.id;
+    console.log(hostId,"hhh");
+    
     const { requestId } = req.params;
+    console.log(requestId,"oooooooooooooo");
+    
 
     const request = await ChargingRequest.findOne({
       _id: requestId,
