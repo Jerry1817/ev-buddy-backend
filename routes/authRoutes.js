@@ -1,6 +1,6 @@
 const express = require("express");
 const {protect}=require('../middleware/authMiddleware')
-const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats } = require("../controllers/authController");
+const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats, addReview } = require("../controllers/authController");
 const router = express.Router();
 
 router.get("/homestats", protect, getDashboardStats);
@@ -12,7 +12,7 @@ router.post('/userslocation',protect,AddLocation)
 router.get('/viewrequests',protect,getMyChargingRequests)
 router.post('/chargingstart',protect,startSessioncharging)
 router.post('/chargingend',protect,endSession)
-
 router.post('/payment/createorder',protect,createOrder)
+router.post('/addreview',protect,addReview)
 
 module.exports = router;

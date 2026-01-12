@@ -167,11 +167,15 @@ const isExpired = (createdAt) => {
 // userside
 exports.getMyChargingRequests = async (req, res) => {
   try {
+    // 1️⃣ Fetch user requests (latest first)
     const requests = await ChargingRequest.find({
       driver: req.user.id,
-    }).populate("host", "name evStation");
+    })
+      .populate("host", "name evStation")
+      .sort({ createdAt: -1 });
 
-    for (let reqItem of requests) {
+    // 2️⃣ Auto-reject expired pending requests
+    for (const reqItem of requests) {
       if (
         reqItem.status === "pending" &&
         isExpired(reqItem.createdAt)
@@ -181,11 +185,37 @@ exports.getMyChargingRequests = async (req, res) => {
       }
     }
 
+    // 3️⃣ Get charging sessions for these requests
+    const requestIds = requests.map(r => r._id);
+
+    const sessions = await ChargingSession.find({
+      request: { $in: requestIds },
+      driver: req.user.id,
+    });
+
+    // 4️⃣ Map sessions by request ID
+    const sessionMap = {};
+    sessions.forEach(session => {
+      sessionMap[session.request.toString()] = session;
+    });
+
+    // 5️⃣ Merge session info into requests
+    const formattedRequests = requests.map(reqItem => {
+      const session = sessionMap[reqItem._id.toString()];
+
+      return {
+        ...reqItem.toObject(),
+        chargingStatus: session?.status || null,
+        paymentStatus: session?.paymentStatus || null,
+      };
+    });
+
     res.json({
       success: true,
-      data: requests,
+      data: formattedRequests,
     });
-  } catch (err) {
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -347,6 +377,84 @@ exports.createOrder = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
+
+
+exports.addReview = async (req, res) => {
+  try {
+    const { requestId, stationId, rating, review, tags } = req.body;
+    const driverId = req.user.id;
+
+    // 1️⃣ Validate request
+    const chargingRequest = await ChargingRequest.findById(requestId);
+    if (!chargingRequest) {
+      return res.status(404).json({ message: "Charging request not found" });
+    }
+
+    if (chargingRequest.driver.toString() !== driverId) {
+      return res.status(403).json({ message: "Unauthorized review attempt" });
+    }
+
+    // 2️⃣ Check charging session (must be PAID)
+    const session = await ChargingSession.findOne({
+      request: requestId,
+      driver: driverId,
+      paymentStatus: "PAID",
+    });
+
+    if (!session) {
+      return res.status(400).json({
+        message: "Review allowed only after completed & paid charging session",
+      });
+    }
+
+    // 3️⃣ Prevent duplicate reviews
+    const existingReview = await Review.findOne({ request: requestId });
+    if (existingReview) {
+      return res.status(409).json({
+        message: "You have already reviewed this charging session",
+      });
+    }
+
+    // 4️⃣ Create review
+    const newReview = await Review.create({
+      request: requestId,
+      station: stationId,
+      driver: driverId,
+      host: chargingRequest.host,
+      rating,
+      review,
+      tags,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Review added successfully",
+      data: newReview,
+    });
+  } catch (error) {
+    console.error("Add Review Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 exports.getDashboardStats = async (req, res) => {
