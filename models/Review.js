@@ -6,13 +6,7 @@ const reviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "ChargingRequest",
       required: true,
-      unique: true, // ✅ one review per request
-    },
-
-    station: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "EvStation",
-      required: true,
+      unique: true, //  one review per request
     },
 
     driver: {

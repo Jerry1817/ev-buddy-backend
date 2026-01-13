@@ -5,7 +5,7 @@ const ChargingRequest = require("../models/ChargingRequest");
 const crypto = require("crypto");
 const razorpay = require("../config/razorpay");
 const ChargingSession = require("../models/ChargingSession");
-
+const Review =require('../models/Review')
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -384,10 +384,14 @@ exports.createOrder = async (req, res) => {
 
 exports.addReview = async (req, res) => {
   try {
+    console.log("hjdhhdsjushd");
+    
     const { requestId, stationId, rating, review, tags } = req.body;
+    console.log(req.body,"ooooooooooooooo");
+    
     const driverId = req.user.id;
 
-    // 1️⃣ Validate request
+    // 1️ Validate request
     const chargingRequest = await ChargingRequest.findById(requestId);
     if (!chargingRequest) {
       return res.status(404).json({ message: "Charging request not found" });
@@ -396,12 +400,12 @@ exports.addReview = async (req, res) => {
     if (chargingRequest.driver.toString() !== driverId) {
       return res.status(403).json({ message: "Unauthorized review attempt" });
     }
-
-    // 2️⃣ Check charging session (must be PAID)
+    // 2️ Check charging session (must be PAID)
     const session = await ChargingSession.findOne({
       request: requestId,
       driver: driverId,
       paymentStatus: "PAID",
+      status: "COMPLETED",
     });
 
     if (!session) {
@@ -410,7 +414,7 @@ exports.addReview = async (req, res) => {
       });
     }
 
-    // 3️⃣ Prevent duplicate reviews
+    // 3️ Prevent duplicate reviews
     const existingReview = await Review.findOne({ request: requestId });
     if (existingReview) {
       return res.status(409).json({
@@ -418,7 +422,7 @@ exports.addReview = async (req, res) => {
       });
     }
 
-    // 4️⃣ Create review
+    // 4️ Create review
     const newReview = await Review.create({
       request: requestId,
       station: stationId,
@@ -428,6 +432,18 @@ exports.addReview = async (req, res) => {
       review,
       tags,
     });
+
+
+
+ // 5️ Update host average rating
+    const host = await User.findById(chargingRequest.host);
+
+    host.reviewCount = (host.reviewCount || 0) + 1;
+    host.averageRating =
+      ((host.averageRating || 0) * (host.reviewCount - 1) + rating) /
+      host.reviewCount;
+
+    await host.save();
 
     res.status(201).json({
       success: true,

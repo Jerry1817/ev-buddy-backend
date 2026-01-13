@@ -45,6 +45,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    averageRating :{
+      type:String
+    },
+    reviewCount :{
+      type:Number
+    },
      evStation: {
       name: String,
       address: String,
