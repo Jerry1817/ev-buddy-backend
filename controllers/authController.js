@@ -7,23 +7,82 @@ const razorpay = require("../config/razorpay");
 const ChargingSession = require("../models/ChargingSession");
 const Review =require('../models/Review')
 const Complaint = require("../models/Complaint");
+const sendOtpEmail =require('../config/email')
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 exports.register = async (req, res, next) => {
-
+  
   try {
-    const user = await User.create(req.body);    
+    const {
+      name,
+      email,
+      password,
+      phone,
+      roles,
+      evModel,
+    } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and password are required",
+      });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ email }, { phone }],
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "User already exists with this email or phone",
+      });
+    }
+
+  
+
+    const userData = {
+      name,
+      email,
+      password,
+      phone,
+      roles: roles || "DRIVER",
+      evModel,
+    };
+
+    const user = await User.create(userData);
+
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000; 
+    await user.save();
+
+
+    await sendOtpEmail(user.email, otp);
+
     res.status(201).json({
       success: true,
       token: generateToken(user._id),
-      data: user,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        roles: user.roles,
+        evModel: user.evModel,
+      },
     });
-  } catch (err) {
-    next(err);
+
+  } catch (error) {
+    next(error);
   }
 };
+
 
 
 /* =========================
@@ -499,60 +558,89 @@ exports.addComplaint = async (req, res) => {
 };
 
 
-
-
-
-
-
-exports.getDashboardStats = async (req, res) => {
+exports.Userprofile = async (req, res) => {
   try {
-    // 1️⃣ Total active charging stations
-    console.log(req.user.id,"req.user.id");
-    
-      const usercharged = await ChargingRequest.countDocuments(
-        {driver:req.user.id,
-          status:"accepted"},{$sum:1}
-      );
+    const userId = req.user.id; 
+    const user = await User.findById(userId)
+      .select("-password"); 
 
-    const totalStations = await User.countDocuments({
-      roles: "HOST",
-      isHostActive: true,
-    });
-
-    // 2️⃣ Connector type count
-    const connectorTypeCount = await User.aggregate([
-      {
-        $match: {
-          roles: "HOST",
-          isHostActive: true,
-          "evStation.connectorType": { $exists: true, $ne: null },
-        },
-      },
-      {
-        $group: {
-          _id: "$evStation.connectorType",
-          count: { $sum: 1 },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          connectorType: "$_id",
-          count: 1,
-        },
-      },
-    ]);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
 
     res.status(200).json({
       success: true,
-      data: {
-        usercharged,
-        totalStations,
-        connectorTypeCount,
-      },
+      data: user,
     });
+
   } catch (error) {
-    console.error("Dashboard stats error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Get profile error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch user profile",
+    });
   }
 };
+
+
+
+
+
+
+
+
+// exports.getDashboardStats = async (req, res) => {
+//   try {
+//     // 1️⃣ Total active charging stations
+//     console.log(req.user.id,"req.user.id");
+    
+//       const usercharged = await ChargingRequest.countDocuments(
+//         {driver:req.user.id,
+//           status:"accepted"},{$sum:1}
+//       );
+
+//     const totalStations = await User.countDocuments({
+//       roles: "HOST",
+//       isHostActive: true,
+//     });
+
+//     // 2️⃣ Connector type count
+//     const connectorTypeCount = await User.aggregate([
+//       {
+//         $match: {
+//           roles: "HOST",
+//           isHostActive: true,
+//           "evStation.connectorType": { $exists: true, $ne: null },
+//         },
+//       },
+//       {
+//         $group: {
+//           _id: "$evStation.connectorType",
+//           count: { $sum: 1 },
+//         },
+//       },
+//       {
+//         $project: {
+//           _id: 0,
+//           connectorType: "$_id",
+//           count: 1,
+//         },
+//       },
+//     ]);
+
+//     res.status(200).json({
+//       success: true,
+//       data: {
+//         usercharged,
+//         totalStations,
+//         connectorTypeCount,
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Dashboard stats error:", error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };

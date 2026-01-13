@@ -35,7 +35,7 @@ const complaintSchema = new mongoose.Schema(
       enum: ["LOW", "MEDIUM", "HIGH"],
       default: "MEDIUM",
     },
-
+    
     images: [
       {
         type: String, // Cloudinary / local path
