@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const razorpay = require("../config/razorpay");
 const ChargingSession = require("../models/ChargingSession");
 const Review =require('../models/Review')
+const Complaint = require("../models/Complaint");
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -459,13 +460,43 @@ exports.addReview = async (req, res) => {
 
 
 
+exports.addComplaint = async (req, res) => {
+  try {
+    const { category, subject, description, priority } = req.body;
 
+    if (!category || !subject || !description) {
+      return res.status(400).json({
+        success: false,
+        message: "All required fields must be filled",
+      });
+    }
 
+    const imagePaths = req.files
+      ? req.files.map((file) => file.path)
+      : [];
 
+    const complaint = await Complaint.create({
+      user: req.user.id,
+      category,
+      subject,
+      description,
+      priority,
+      images: imagePaths,
+    });
 
-
-
-
+    res.status(201).json({
+      success: true,
+      message: "Complaint submitted successfully",
+      data: complaint,
+    });
+  } catch (error) {
+    console.error("Add complaint error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
 
 
 

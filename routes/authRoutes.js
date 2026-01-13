@@ -1,6 +1,7 @@
 const express = require("express");
 const {protect}=require('../middleware/authMiddleware')
-const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats, addReview } = require("../controllers/authController");
+const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats, addReview, addComplaint } = require("../controllers/authController");
+const upload = require("../middleware/upload.Middleware");
 const router = express.Router();
 
 router.get("/homestats", protect, getDashboardStats);
@@ -14,5 +15,6 @@ router.post('/chargingstart',protect,startSessioncharging)
 router.post('/chargingend',protect,endSession)
 router.post('/payment/createorder',protect,createOrder)
 router.post('/addreview',protect,addReview)
+router.post('/complaint',protect,upload.array("images", 5),addComplaint)
 
 module.exports = router;
