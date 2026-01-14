@@ -5,24 +5,16 @@ const ChargingRequest = require("../models/ChargingRequest");
 const crypto = require("crypto");
 const razorpay = require("../config/razorpay");
 const ChargingSession = require("../models/ChargingSession");
-const Review =require('../models/Review')
+const Review = require("../models/Review");
 const Complaint = require("../models/Complaint");
-const sendOtpEmail =require('../config/email')
+const sendOtpEmail = require("../config/email");
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 exports.register = async (req, res, next) => {
-  
   try {
-    const {
-      name,
-      email,
-      password,
-      phone,
-      roles,
-      evModel,
-    } = req.body;
+    const { name, email, password, phone, roles, evModel } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -42,8 +34,6 @@ exports.register = async (req, res, next) => {
       });
     }
 
-  
-
     const userData = {
       name,
       email,
@@ -55,19 +45,16 @@ exports.register = async (req, res, next) => {
 
     const user = await User.create(userData);
 
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.otp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000; 
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
-
 
     await sendOtpEmail(user.email, otp);
 
     res.status(201).json({
       success: true,
-      token: generateToken(user._id),
       data: {
         id: user._id,
         name: user.name,
@@ -77,54 +64,163 @@ exports.register = async (req, res, next) => {
         evModel: user.evModel,
       },
     });
-
   } catch (error) {
     next(error);
   }
 };
 
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    console.log(otp, "otpp");
 
+    const user = await User.findOne({ otp });
+    console.log(user, "userddddddd");
+
+    if (!user || user.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
+
+    if (user.otpExpires < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired",
+      });
+    }
+
+    user.isVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Email verified successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "OTP verification failed",
+    });
+  }
+};
+
+exports.resendOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "User already verified",
+      });
+    }
+
+    await sendOtpEmail(user.email, otp);
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "OTP resent successfully",
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to resend OTP",
+    });
+  }
+};
 
 /* =========================
    LOGIN (User / Host)
 ========================= */
 exports.login = async (req, res, next) => {
   try {
-    const { email, password ,phone} = req.body;
-    
+    const { email, password, phone } = req.body;
+
     const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password))) {
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
-      user.phone=phone
-      await user.save()
-      
-  res.json({
-  success: true,
-  token: generateToken(user._id),
-  role: user.roles.includes("HOST") ? "HOST" : "DRIVER",
-  message:"user logged in successfully",
-  data: {
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    phone:user.phone
-  }
-});
 
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email before logging in",
+      });
+    }
+
+    if (user.roles === "HOST" && !user.isHostActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Host account is not activated yet",
+      });
+    }
+
+
+    if (phone && phone !== user.phone) {
+      user.phone = phone;
+      await user.save();
+    }
+
+    res.json({
+      success: true,
+      token: generateToken(user._id),
+      role: user.roles.includes("HOST") ? "HOST" : "DRIVER",
+      message: "user logged in successfully",
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+      },
+    });
   } catch (err) {
     next(err);
   }
 };
 
-
 exports.getProfile = async (req, res) => {
-  console.log(req.user.id,"oo");
+  console.log(req.user.id, "oo");
   const user = await User.findById(req.user.id);
-  
+
   if (!user) return res.status(404).json({ message: "User not found" });
 
   res.json({
@@ -141,28 +237,36 @@ exports.getProfile = async (req, res) => {
   });
 };
 
-
 exports.becomeHost = async (req, res) => {
-  const { stationName, address, availableChargers,chargingPricePerUnit, longitude,latitude } = req.body;
-  
+  const {
+    stationName,
+    address,
+    availableChargers,
+    chargingPricePerUnit,
+    longitude,
+    latitude,
+  } = req.body;
+
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     user.roles = "HOST";
     user.isHostActive = true;
-    user.evStation = { name: stationName, address, availableChargers,chargingPricePerUnit };
-      user.location = {
+    user.evStation = {
+      name: stationName,
+      address,
+      availableChargers,
+      chargingPricePerUnit,
+    };
+    user.location = {
       type: "Point",
-      coordinates: [
-        Number(latitude),
-        Number(longitude),
-      ],
+      coordinates: [Number(latitude), Number(longitude)],
     };
 
     await user.save();
 
-   res.json({
+    res.json({
       success: true,
       message: "Host registered successfully",
       data: user,
@@ -171,12 +275,10 @@ exports.becomeHost = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: "Server error" });
   }
-}
-
+};
 
 exports.AddLocation = async (req, res) => {
   try {
-  
     const { latitude, longitude } = req.body;
 
     if (!latitude || !longitude) {
@@ -197,7 +299,7 @@ exports.AddLocation = async (req, res) => {
 
     user.location = {
       type: "Point",
-      coordinates: [longitude, latitude], 
+      coordinates: [longitude, latitude],
     };
 
     await user.save();
@@ -236,17 +338,14 @@ exports.getMyChargingRequests = async (req, res) => {
 
     // 2️⃣ Auto-reject expired pending requests
     for (const reqItem of requests) {
-      if (
-        reqItem.status === "pending" &&
-        isExpired(reqItem.createdAt)
-      ) {
+      if (reqItem.status === "pending" && isExpired(reqItem.createdAt)) {
         reqItem.status = "rejected";
         await reqItem.save();
       }
     }
 
     // 3️⃣ Get charging sessions for these requests
-    const requestIds = requests.map(r => r._id);
+    const requestIds = requests.map((r) => r._id);
 
     const sessions = await ChargingSession.find({
       request: { $in: requestIds },
@@ -255,12 +354,12 @@ exports.getMyChargingRequests = async (req, res) => {
 
     // 4️⃣ Map sessions by request ID
     const sessionMap = {};
-    sessions.forEach(session => {
+    sessions.forEach((session) => {
       sessionMap[session.request.toString()] = session;
     });
 
     // 5️⃣ Merge session info into requests
-    const formattedRequests = requests.map(reqItem => {
+    const formattedRequests = requests.map((reqItem) => {
       const session = sessionMap[reqItem._id.toString()];
 
       return {
@@ -279,7 +378,6 @@ exports.getMyChargingRequests = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 exports.verifyPayment = async (req, res) => {
   try {
@@ -315,13 +413,11 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
-
 exports.startSessioncharging = async (req, res) => {
   try {
-
-//     if (req.user.id.toString() !== request.host.toString()) {
-//   return res.status(403).json({ message: "Only host can start session" });
-// }
+    //     if (req.user.id.toString() !== request.host.toString()) {
+    //   return res.status(403).json({ message: "Only host can start session" });
+    // }
 
     const { requestId } = req.body;
 
@@ -347,8 +443,6 @@ exports.startSessioncharging = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
-
 
 exports.endSession = async (req, res) => {
   try {
@@ -381,8 +475,6 @@ exports.endSession = async (req, res) => {
 
     await session.save();
 
-  
-
     res.status(200).json({
       success: true,
       message: "Charging session ended",
@@ -398,39 +490,37 @@ exports.endSession = async (req, res) => {
   }
 };
 
-
 exports.createOrder = async (req, res) => {
   try {
     const { sessionId } = req.body;
-    console.log(sessionId,);
+    console.log(sessionId);
 
-  const user = await User.findById(req.user.id);
-    
+    const user = await User.findById(req.user.id);
+
     const session = await ChargingSession.findById(sessionId);
     if (!session || session.status !== "COMPLETED") {
       return res.status(400).json({ message: "Invalid session" });
     }
 
-    const hostid=session.host
+    const hostid = session.host;
 
-    const host=await User.findById({_id:hostid})
+    const host = await User.findById({ _id: hostid });
 
-    
     const order = await razorpay.orders.create({
       amount: session.totalCost * 100, // paise
       currency: "INR",
       receipt: `session_${session._id}`,
     });
-    
-    session.paymentStatus="PAID"
-    await session.save()
+
+    session.paymentStatus = "PAID";
+    await session.save();
 
     res.status(200).json({
       success: true,
       order,
       session,
       host,
-      user
+      user,
     });
   } catch (err) {
     console.error(err);
@@ -438,17 +528,13 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-
-
-
-
 exports.addReview = async (req, res) => {
   try {
     console.log("hjdhhdsjushd");
-    
+
     const { requestId, stationId, rating, review, tags } = req.body;
-    console.log(req.body,"ooooooooooooooo");
-    
+    console.log(req.body, "ooooooooooooooo");
+
     const driverId = req.user.id;
 
     // 1️ Validate request
@@ -493,9 +579,7 @@ exports.addReview = async (req, res) => {
       tags,
     });
 
-
-
- // 5️ Update host average rating
+    // 5️ Update host average rating
     const host = await User.findById(chargingRequest.host);
 
     host.reviewCount = (host.reviewCount || 0) + 1;
@@ -516,9 +600,6 @@ exports.addReview = async (req, res) => {
   }
 };
 
-
-
-
 exports.addComplaint = async (req, res) => {
   try {
     const { category, subject, description, priority } = req.body;
@@ -530,9 +611,7 @@ exports.addComplaint = async (req, res) => {
       });
     }
 
-    const imagePaths = req.files
-      ? req.files.map((file) => file.path)
-      : [];
+    const imagePaths = req.files ? req.files.map((file) => file.path) : [];
 
     const complaint = await Complaint.create({
       user: req.user.id,
@@ -557,12 +636,10 @@ exports.addComplaint = async (req, res) => {
   }
 };
 
-
 exports.Userprofile = async (req, res) => {
   try {
-    const userId = req.user.id; 
-    const user = await User.findById(userId)
-      .select("-password"); 
+    const userId = req.user.id;
+    const user = await User.findById(userId).select("-password");
 
     if (!user) {
       return res.status(404).json({
@@ -575,7 +652,6 @@ exports.Userprofile = async (req, res) => {
       success: true,
       data: user,
     });
-
   } catch (error) {
     console.error("Get profile error:", error);
     res.status(500).json({
@@ -585,18 +661,11 @@ exports.Userprofile = async (req, res) => {
   }
 };
 
-
-
-
-
-
-
-
 // exports.getDashboardStats = async (req, res) => {
 //   try {
 //     // 1️⃣ Total active charging stations
 //     console.log(req.user.id,"req.user.id");
-    
+
 //       const usercharged = await ChargingRequest.countDocuments(
 //         {driver:req.user.id,
 //           status:"accepted"},{$sum:1}
