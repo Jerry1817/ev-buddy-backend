@@ -13,6 +13,7 @@ router.get("/profile", protect, getProfile);
 router.post('/becomehost',protect,becomeHost)
 router.post('/userslocation',protect,AddLocation)
 router.get('/viewrequests',protect,getMyChargingRequests)
+// router.patch("/charging/arrived",protect,Arrivedrequest)
 router.post('/chargingstart',protect,startSessioncharging)
 router.post('/chargingend',protect,endSession)
 router.post('/payment/createorder',protect,createOrder)
@@ -21,3 +22,5 @@ router.post('/complaint',protect,upload.array("images", 5),addComplaint)
 router.get('/me',protect,Userprofile)
 
 module.exports = router;
+
+

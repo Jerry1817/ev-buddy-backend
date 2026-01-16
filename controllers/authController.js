@@ -69,6 +69,7 @@ exports.register = async (req, res, next) => {
   }
 };
 
+
 exports.verifyOtp = async (req, res) => {
   try {
     const { otp } = req.body;
@@ -162,6 +163,8 @@ exports.resendOtp = async (req, res) => {
 exports.login = async (req, res, next) => {
   try {
     const { email, password, phone } = req.body;
+    console.log(req.body,"ll");
+    
 
     const user = await User.findOne({ email });
 
@@ -179,13 +182,12 @@ exports.login = async (req, res, next) => {
       });
     }
 
-
-    if (!user.isVerified) {
-      return res.status(403).json({
-        success: false,
-        message: "Please verify your email before logging in",
-      });
-    }
+    // if (!user.isVerified) {
+    //   return res.status(403).json({
+    //     success: false,
+    //     message: "Please verify your email before logging in",
+    //   });
+    // }
 
     if (user.roles === "HOST" && !user.isHostActive) {
       return res.status(403).json({
@@ -193,7 +195,6 @@ exports.login = async (req, res, next) => {
         message: "Host account is not activated yet",
       });
     }
-
 
     if (phone && phone !== user.phone) {
       user.phone = phone;
@@ -221,7 +222,9 @@ exports.getProfile = async (req, res) => {
   console.log(req.user.id, "oo");
   const user = await User.findById(req.user.id);
 
-  if (!user) return res.status(404).json({ message: "User not found" });
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
 
   res.json({
     success: true,
@@ -238,30 +241,50 @@ exports.getProfile = async (req, res) => {
 };
 
 exports.becomeHost = async (req, res) => {
-  const {
-    stationName,
-    address,
-    availableChargers,
-    chargingPricePerUnit,
-    longitude,
-    latitude,
-  } = req.body;
-
   try {
+    const {
+      stationName,
+      address,
+      availableChargers,
+      chargingPricePerUnit,
+      latitude,
+      longitude,
+    } = req.body;
+
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Validate numbers
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+
+    if (
+      Number.isNaN(lat) ||
+      Number.isNaN(lng) ||
+      lat < -90 || lat > 90 ||
+      lng < -180 || lng > 180
+    ) {
+      return res.status(400).json({
+        message: "Invalid latitude or longitude",
+      });
+    }
 
     user.roles = "HOST";
     user.isHostActive = true;
+
     user.evStation = {
       name: stationName,
       address,
       availableChargers,
       chargingPricePerUnit,
     };
-    user.location = {
+
+    // 🔥 STORE STATION LOCATION CORRECTLY
+   user.location = {
       type: "Point",
-      coordinates: [Number(latitude), Number(longitude)],
+      coordinates: [lng, lat], // IMPORTANT ORDER
     };
 
     await user.save();
@@ -277,14 +300,28 @@ exports.becomeHost = async (req, res) => {
   }
 };
 
+
 exports.AddLocation = async (req, res) => {
   try {
-    const { latitude, longitude } = req.body;
+    let { latitude, longitude } = req.body;
 
-    if (!latitude || !longitude) {
+    latitude = Number(latitude);
+    longitude = Number(longitude);
+
+    if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
       return res.status(400).json({
         success: false,
-        message: "Latitude and longitude are required",
+        message: "Latitude and longitude must be numbers",
+      });
+    }
+
+    if (
+      latitude < -90 || latitude > 90 ||
+      longitude < -180 || longitude > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid latitude or longitude range",
       });
     }
 
@@ -297,10 +334,17 @@ exports.AddLocation = async (req, res) => {
       });
     }
 
+    // Always update user movement location
     user.location = {
       type: "Point",
       coordinates: [longitude, latitude],
     };
+
+    // 🔥 IMPORTANT: Do NOT auto-update station location
+    // Only set it when user becomes host
+    if (user.roles !== "HOST") {
+      // fine — just user movement
+    }
 
     await user.save();
 
@@ -317,6 +361,7 @@ exports.AddLocation = async (req, res) => {
     });
   }
 };
+
 
 const AUTO_CANCEL_MINUTES = 10;
 
@@ -378,6 +423,26 @@ exports.getMyChargingRequests = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 exports.verifyPayment = async (req, res) => {
   try {

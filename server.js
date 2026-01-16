@@ -6,6 +6,12 @@ const connectDB = require("./config/db");
 const stationRoutes = require("./routes/stationRoutes");
 const app = express();
 
+// app.use(cors({
+//   origin:"http://192.168.1.46:5173",
+//   credentials: true,
+// }));
+
+
 app.use(cors({
   origin:"http://localhost:5173",
   credentials: true,

@@ -1,14 +1,9 @@
 const ChargingRequest = require("../models/ChargingRequest");
 const User = require("../models/User");
 
-/* ======================================================
-   USER → Send charging request
-   ====================================================== */
-
 exports.sendRequest = async (req, res) => {
-  try {
-    console.log("lllllllllllllllll");
-    
+  try {    
+
     const { hostid } = req.body;
     const driverId = req.user.id;
 
@@ -24,6 +19,13 @@ exports.sendRequest = async (req, res) => {
       return res.status(404).json({ message: "host not found" });
     }
 
+     if (driverId === hostid) {
+    return res.status(400).json({
+      success: false,
+      message: "You cannot request your own station",
+    });
+  }
+
     if (!host._id) {
       return res
         .status(400)
@@ -34,7 +36,7 @@ exports.sendRequest = async (req, res) => {
     const existing = await ChargingRequest.findOne({
       driverId,
       hostid,
-      status: "pending",
+      status: "REQUESTED",
     });
 
     if (existing) {
@@ -47,7 +49,7 @@ exports.sendRequest = async (req, res) => {
     const request = await ChargingRequest.create({
      driver: driverId,
      host: hostid,
-      status: "pending",
+      status: "REQUESTED",
     });
 
     res.status(201).json({
@@ -98,7 +100,7 @@ exports.acceptRequest = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    request.status = "accepted";
+    request.status = "ACCEPTED";
     await request.save();
 
     res.status(200).json({
@@ -134,7 +136,7 @@ exports.rejectRequest = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    request.status = "rejected";
+    request.status = "REJECTED";
     await request.save();
 
     res.status(200).json({

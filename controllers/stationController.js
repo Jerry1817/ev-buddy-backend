@@ -27,7 +27,7 @@ exports.getNearbyStations = async (req, res) => {
         $near: {
           $geometry: {
             type: "Point",
-            coordinates: coordinates,
+            coordinates: user.location.coordinates,
           },
           $maxDistance: 5000, // 5 km (you can change to 10000 = 10km)
         },

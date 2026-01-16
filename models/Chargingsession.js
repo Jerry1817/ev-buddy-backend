@@ -10,30 +10,60 @@ const chargingSessionSchema = new mongoose.Schema(
 
     driver: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "users",
+      ref: "User",
       required: true,
     },
 
     host: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "users",
+      ref: "User",
       required: true,
     },
 
-    startTime: Date,
-    endTime: Date,
+    startTime: {
+      type: Date,
+    },
+
+    endTime: {
+      type: Date,
+    },
+
     durationInMinutes: Number,
+
+    energyConsumed: {
+      type: Number, // kWh
+    },
+
+    pricePerUnit: Number,
+
     totalCost: Number,
-    
-    paymentStatus: {
+
+    startedBy: {
       type: String,
-      enum: ["PENDING", "PAID"],
-      default: "PENDING",
+      enum: ["USER"],
+      default: "USER",
+    },
+
+    stoppedBy: {
+      type: String,
+      enum: ["HOST", "SYSTEM"],
     },
 
     status: {
       type: String,
-      enum: ["STARTED", "COMPLETED"],
+      enum: [
+        "CREATED",    // session created, not started
+        "CHARGING",   // electricity flowing
+        "STOP_REQUESTED",
+        "COMPLETED",
+      ],
+      default: "CREATED",
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["PENDING", "PAID"],
+      default: "PENDING",
     },
   },
   { timestamps: true }

@@ -16,13 +16,30 @@ const chargingRequestSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
-      default: "pending",
+      enum: [
+        "REQUESTED", // user sent request
+        "ACCEPTED", // host accepted
+        "REJECTED",
+        "ARRIVED", // user reached station
+        "START_REQUESTED", // user clicked start
+        "ACTIVE", // charging ongoing
+        "COMPLETED",
+        "CANCELLED",
+      ],
+      default: "REQUESTED",
     },
-      requestedAt: {
+
+    requestedAt: {
       type: Date,
       default: Date.now,
     },
+
+    arrivedAt: Date,
+    acceptedAt: Date,
+    startedAt: Date, // When host confirms start
+    endedAt: Date, // When host stops charging
+    totalDuration: Number, // optional: can be calculated
+    totalCost: Number, // optional: calculated based on duration and chargingPricePerUnit
   },
   { timestamps: true }
 );

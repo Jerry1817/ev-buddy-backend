@@ -29,17 +29,22 @@ const userSchema = new mongoose.Schema(
       default: "DRIVER",
     },
 
-    location: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        default: undefined,
+  location: {
+  type: {
+    type: String,
+    enum: ["Point"],
+  },
+  coordinates: {
+    type: [Number], // [lng, lat]
+    validate: {
+      validator: function (v) {
+        return !v || v.length === 2;
       },
-      coordinates: {
-        type: [Number],
-        default: undefined,
-      },
+      message: "Location coordinates must be [lng, lat]",
     },
+  },
+},
+
 
     isHostActive: {
       type: Boolean,
