@@ -40,8 +40,8 @@ const chargingSessionSchema = new mongoose.Schema(
 
     startedBy: {
       type: String,
-      enum: ["USER"],
-      default: "USER",
+      enum: ["USER", "HOST"],
+      default: "HOST",
     },
 
     stoppedBy: {

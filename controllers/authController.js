@@ -165,7 +165,6 @@ exports.login = async (req, res, next) => {
     const { email, password, phone } = req.body;
     console.log(req.body,"ll");
     
-
     const user = await User.findOne({ email });
 
     if (!email || !password) {
@@ -425,6 +424,56 @@ exports.getMyChargingRequests = async (req, res) => {
 };
 
 
+/**
+ * DRIVER → Mark as Arrived at charging station
+ * Updates request status from ACCEPTED to ARRIVED
+ */
+exports.Arrivedrequest = async (req, res) => {
+  try {
+    const driverId = req.user.id;
+    const { requestId } = req.params;
+
+    // Find the request belonging to this driver
+    const request = await ChargingRequest.findOne({
+      _id: requestId,
+      driver: driverId,
+    });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Charging request not found",
+      });
+    }
+
+    // Validate current status is ACCEPTED
+    if (request.status !== "ACCEPTED") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot mark as arrived. Current status is ${request.status}. Request must be accepted first.`,
+      });
+    }
+
+    // Update status to ARRIVED
+    request.status = "ARRIVED";
+    request.arrivedAt = new Date();
+    await request.save();
+
+    console.log("✅ Driver arrived at station:", request._id);
+
+    res.status(200).json({
+      success: true,
+      message: "Arrival confirmed! Please connect your charger and wait for host to start charging.",
+      data: request,
+    });
+  } catch (error) {
+    console.error("❌ Arrived request error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to mark arrival",
+    });
+  }
+};
 
 
 
@@ -557,19 +606,20 @@ exports.endSession = async (req, res) => {
 
 exports.createOrder = async (req, res) => {
   try {
-    const { sessionId } = req.body;
-    console.log(sessionId);
+    const { requestId } = req.body;
+    console.log(requestId,"requestId");
 
     const user = await User.findById(req.user.id);
 
-    const session = await ChargingSession.findById(sessionId);
+    const session = await ChargingSession.findOne({ request: requestId });
+    
     if (!session || session.status !== "COMPLETED") {
       return res.status(400).json({ message: "Invalid session" });
     }
 
     const hostid = session.host;
 
-    const host = await User.findById({ _id: hostid });
+    const host = await User.findById(hostid);
 
     const order = await razorpay.orders.create({
       amount: session.totalCost * 100, // paise
@@ -726,7 +776,7 @@ exports.Userprofile = async (req, res) => {
   }
 };
 
-// exports.getDashboardStats = async (req, res) => {
+
 //   try {
 //     // 1️⃣ Total active charging stations
 //     console.log(req.user.id,"req.user.id");

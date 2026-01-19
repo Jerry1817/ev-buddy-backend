@@ -105,45 +105,152 @@ exports.viewallrequests = async (req, res) => {
 
 
 
+/**
+ * HOST → Start Charging Session
+ * Called when driver has arrived and connected charger
+ */
+exports.startCharging = async (req, res) => {
+  try {
+    const hostId = req.user.id;
+    const { requestId } = req.params;
 
+    // Find the request
+    const request = await ChargingRequest.findOne({
+      _id: requestId,
+      host: hostId,
+    }).populate("host", "evStation");
 
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
 
+    // Validate status is ARRIVED
+    if (request.status !== "ARRIVED") {
+      return res.status(400).json({
+        message: `Cannot start charging. Current status is ${request.status}. Driver must arrive first.`,
+      });
+    }
 
+    // Get price per unit from host's evStation
+    const pricePerUnit = request.host?.evStation?.chargingPricePerUnit || 10;
 
-// exports.endSession = async (req, res) => {
-//   try {
+    // Create charging session
+    const session = await Chargingsession.create({
+      request: request._id,
+      driver: request.driver,
+      host: hostId,
+      startTime: new Date(),
+      pricePerUnit: pricePerUnit,
+      startedBy: "HOST",
+      status: "CHARGING",
+    });
 
-// //     if (req.user.id.toString() !== session.host.toString()) {
-// //   return res.status(403).json({ message: "Only host can end session" });
-// // }
+    // Update request status
+    request.status = "ACTIVE";
+    request.startedAt = new Date();
+    await request.save();
 
-//     const { sessionId } = req.body;
-//     console.log(req.body,"ll");
+    console.log("✅ Charging started by host:", session._id);
 
+    res.status(200).json({
+      success: true,
+      message: "Charging started successfully",
+      session,
+      request,
+    });
+  } catch (error) {
+    console.error("❌ Start charging error:", error);
+    res.status(500).json({ message: "Failed to start charging" });
+  }
+};
+
+/**
+ * HOST → Stop Charging Session
+ * Called when charging is complete
+ */
+exports.stopCharging = async (req, res) => {
+  try {
+    const hostId = req.user.id;
+    const { requestId } = req.params;
+
+    // Find the request
+    const request = await ChargingRequest.findOne({
+      _id: requestId,
+      host: hostId,
+    }).populate("host", "evStation");
+
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    // Validate status is ACTIVE
+    if (request.status !== "ACTIVE") {
+      return res.status(400).json({
+        message: `Cannot stop charging. Current status is ${request.status}.`,
+      });
+    }
+
+    // Find the active session
+    const session = await Chargingsession.findOne({
+      request: request._id,
+      status: "CHARGING",
+    });
+
+    if (!session) {
+      return res.status(404).json({ message: "Active session not found" });
+    }
+
+    // Calculate duration and cost
+    const endTime = new Date();
+    const startTime = session.startTime;
+    const durationMs = endTime - startTime;
+    const durationInMinutes = Math.ceil(durationMs / (1000 * 60));
+
+    // Get power from host's evStation (kW)
+    const power = request.host?.evStation?.power || 7;
     
+    // Calculate energy consumed (kWh) = power (kW) * duration (hours)
+    const durationInHours = durationInMinutes / 60;
+    const energyConsumed = Math.round(power * durationInHours * 100) / 100;
 
-//     const session = await ChargingSession.findById(sessionId);
-//     if (!session || session.status !== "STARTED") {
-//       return res.status(400).json({ message: "Invalid session" });
-//     }
+    // Calculate total cost
+    const pricePerUnit = session.pricePerUnit || 10;
+    const totalCost = Math.round(energyConsumed * pricePerUnit * 100) / 100;
 
-//     session.endTime = new Date();
-//     session.status = "COMPLETED";
-//     await session.save();
+    // Update session
+    session.endTime = endTime;
+    session.durationInMinutes = durationInMinutes;
+    session.energyConsumed = energyConsumed;
+    session.totalCost = totalCost;
+    session.stoppedBy = "HOST";
+    session.status = "COMPLETED";
+    await session.save();
 
-//     res.json({
-//       success: true,
-//       message: "Charging session completed",
-//       data: session,
-//     });
-//   } catch (err) {
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
+    // Update request
+    request.status = "COMPLETED";
+    request.endedAt = endTime;
+    request.totalDuration = durationInMinutes;
+    request.totalCost = totalCost;
+    await request.save();
 
+    console.log("✅ Charging stopped by host. Duration:", durationInMinutes, "mins, Cost: ₹", totalCost);
 
-
-
+    res.status(200).json({
+      success: true,
+      message: "Charging completed successfully",
+      session,
+      request,
+      summary: {
+        durationInMinutes,
+        energyConsumed,
+        totalCost,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Stop charging error:", error);
+    res.status(500).json({ message: "Failed to stop charging" });
+  }
+};
 
 
 

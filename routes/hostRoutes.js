@@ -2,11 +2,15 @@ const express = require("express");
 const router = express.Router();
 
 const {protect} = require("../middleware/authMiddleware");
-const {viewallrequests, startSessioncharging, endSession } = require("../controllers/hostController");
+const {viewallrequests, startCharging, stopCharging } = require("../controllers/hostController");
 
-// 🔥 THIS MUST BE A FUNCTION
-// router.post("/register", authMiddleware, registerStation);
-router.get('/allrequests',protect,viewallrequests)
+// Host view all charging requests
+router.get('/allrequests', protect, viewallrequests);
 
-// router.patch('')
+// Host start charging (when driver has arrived)
+router.patch('/start/:requestId', protect, startCharging);
+
+// Host stop charging (when charging is complete)
+router.patch('/stop/:requestId', protect, stopCharging);
+
 module.exports = router;
