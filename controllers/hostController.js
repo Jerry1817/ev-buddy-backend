@@ -1,13 +1,82 @@
 const Station = require("../models/Station");
 const ChargingRequest = require("../models/ChargingRequest");
 const Chargingsession = require("../models/ChargingSession");
-
+const Review = require("../models/Review");
 
 
 /**
+ * HOST → GET ALL REVIEWS
+ * Fetches all reviews for the logged-in host
+ */
+exports.getHostReviews = async (req, res) => {
+  try {
+    const hostId = req.user.id;
+    console.log(hostId,"hostId");
+    
+
+    // Fetch all reviews where this user is the host
+    const reviewsRaw = await Review.find({ host: hostId })
+      .populate("driver", "name email phone evModel")
+      .populate("request", "requestedAt status")
+      .sort({ createdAt: -1 }); // Most recent first
+
+    // Enrich reviews with session data (for totalCost, duration, etc.)
+    const reviews = await Promise.all(
+      reviewsRaw.map(async (review) => {
+        const reviewObj = review.toObject();
+        
+        // Find the associated charging session
+        const session = await Chargingsession.findOne({ request: review.request._id || review.request });
+        
+        if (session) {
+          reviewObj.session = {
+            totalCost: session.totalCost || 0,
+            energyConsumed: session.energyConsumed || 0,
+            durationInMinutes: session.durationInMinutes || 0,
+            startTime: session.startTime,
+            endTime: session.endTime,
+          };
+        }
+        
+        return reviewObj;
+      })
+    );
+
+    // Calculate stats
+    const totalReviews = reviews.length;
+    const averageRating = totalReviews > 0 
+      ? (reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews).toFixed(1)
+      : 0;
+
+    // Rating distribution
+    const ratingDistribution = {
+      5: reviews.filter(r => r.rating === 5).length,
+      4: reviews.filter(r => r.rating === 4).length,
+      3: reviews.filter(r => r.rating === 3).length,
+      2: reviews.filter(r => r.rating === 2).length,
+      1: reviews.filter(r => r.rating === 1).length,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        reviews,
+        stats: {
+          totalReviews,
+          averageRating: parseFloat(averageRating),
+          ratingDistribution,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get host reviews error:", error);
+    res.status(500).json({ message: "Failed to fetch reviews" });
+  }
+};
+/**
  * HOST → REGISTER STATION
  */
-const registerStation = async (req, res) => {
+exports.registerStation = async (req, res) => {
   try {
     if (!req.user || req.user.role !== "host") {
       return res.status(403).json({ message: "Only hosts can register stations" });
@@ -89,18 +158,6 @@ exports.viewallrequests = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -251,7 +308,6 @@ exports.stopCharging = async (req, res) => {
     res.status(500).json({ message: "Failed to stop charging" });
   }
 };
-
 
 
 

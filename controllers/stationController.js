@@ -5,7 +5,6 @@ const User = require("../models/User");
 exports.getNearbyStations = async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log(userId,";;;;;;;;;;");
     
 
     const user = await User.findById(userId);
@@ -36,8 +35,6 @@ exports.getNearbyStations = async (req, res) => {
       "evStation name address availableChargers"
     );
 
-    console.log(nearbyStations,"nearbyStations");
-    
 
     res.status(200).json({
       success: true,

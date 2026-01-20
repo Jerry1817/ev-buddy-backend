@@ -1,6 +1,6 @@
 const express = require("express");
 const {protect}=require('../middleware/authMiddleware')
-const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, Arrivedrequest, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats, addReview, addComplaint, Userprofile, verifyOtp, resendOtp } = require("../controllers/authController");
+const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, Arrivedrequest, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats, addReview, addComplaint, Userprofile, verifyOtp, resendOtp, getHomeStats } = require("../controllers/authController");
 const upload = require("../middleware/upload.Middleware");
 const router = express.Router();
 
@@ -17,9 +17,11 @@ router.patch("/charging/arrived/:requestId", protect, Arrivedrequest)
 router.post('/chargingstart',protect,startSessioncharging)
 router.post('/chargingend',protect,endSession)
 router.post('/payment/createorder',protect,createOrder)
+router.post('/payment/verify',protect,verifyPayment)
 router.post('/addreview',protect,addReview)
 router.post('/complaint',protect,upload.array("images", 5),addComplaint)
 router.get('/me',protect,Userprofile)
+router.get('/homestats',protect,getHomeStats)
 
 module.exports = router;
 

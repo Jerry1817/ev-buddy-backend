@@ -69,4 +69,5 @@ const chargingSessionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("ChargingSession", chargingSessionSchema);
+module.exports = mongoose.models.ChargingSession || mongoose.model("ChargingSession", chargingSessionSchema);
+

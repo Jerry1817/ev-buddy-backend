@@ -38,7 +38,14 @@ app.use(
   "/api/chargingrequest",
   require("./routes/chargingRequestRoutes")
 );
+app.use("/api/admin", require("./routes/adminRoutes"));
+
+// Start background jobs
+const { startRequestExpiryJob } = require("./jobs/requestExpiryJob");
 
 app.listen(5000, () => {
   console.log("EV Buddy backend running on port 5000");
+  
+  // Start the request auto-expiry scheduler
+  startRequestExpiryJob();
 });

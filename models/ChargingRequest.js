@@ -25,6 +25,7 @@ const chargingRequestSchema = new mongoose.Schema(
         "ACTIVE", // charging ongoing
         "COMPLETED",
         "CANCELLED",
+        "EXPIRED", // auto-cancelled after 10 min no response
       ],
       default: "REQUESTED",
     },

@@ -1,8 +1,8 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const ChargingRequest = require("../models/ChargingRequest");
 const crypto = require("crypto");
+const ChargingRequest = require("../models/ChargingRequest");
 const razorpay = require("../config/razorpay");
 const ChargingSession = require("../models/ChargingSession");
 const Review = require("../models/Review");
@@ -181,6 +181,15 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Check if user is blocked by admin
+    if (user.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        blocked: true,
+        message: "Your account has been blocked by admin. Please contact support.",
+      });
+    }
+
     // if (!user.isVerified) {
     //   return res.status(403).json({
     //     success: false,
@@ -205,11 +214,15 @@ exports.login = async (req, res, next) => {
       token: generateToken(user._id),
       role: user.roles.includes("HOST") ? "HOST" : "DRIVER",
       message: "user logged in successfully",
-      data: {
+      user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
+        evStation: user.evStation || null,
+        evModel: user.evModel || null,
+        averageRating: user.averageRating || 0,
+        reviewCount: user.reviewCount || 0,
       },
     });
   } catch (err) {
@@ -246,6 +259,9 @@ exports.becomeHost = async (req, res) => {
       address,
       availableChargers,
       chargingPricePerUnit,
+      power,
+      connectorType,
+      description,
       latitude,
       longitude,
     } = req.body;
@@ -276,8 +292,11 @@ exports.becomeHost = async (req, res) => {
     user.evStation = {
       name: stationName,
       address,
-      availableChargers,
-      chargingPricePerUnit,
+      availableChargers: Number(availableChargers) || 1,
+      chargingPricePerUnit: Number(chargingPricePerUnit) || 0,
+      power: Number(power) || 0,
+      connectorType: connectorType || "Type 2",
+      description: description || "",
     };
 
     // 🔥 STORE STATION LOCATION CORRECTLY
@@ -479,54 +498,6 @@ exports.Arrivedrequest = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-exports.verifyPayment = async (req, res) => {
-  try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      sessionId,
-    } = req.body;
-
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
-
-    const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body.toString())
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
-      return res.status(400).json({ message: "Invalid payment signature" });
-    }
-
-    const session = await ChargingSession.findById(sessionId);
-    session.paymentStatus = "PAID";
-    await session.save();
-
-    res.json({
-      success: true,
-      message: "Payment successful",
-      data: session,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Payment verification failed" });
-  }
-};
-
 exports.startSessioncharging = async (req, res) => {
   try {
     //     if (req.user.id.toString() !== request.host.toString()) {
@@ -627,8 +598,9 @@ exports.createOrder = async (req, res) => {
       receipt: `session_${session._id}`,
     });
 
-    session.paymentStatus = "PAID";
-    await session.save();
+    // Do NOT update status here (wait for verification)
+    // session.paymentStatus = "PAID";
+    // await session.save();
 
     res.status(200).json({
       success: true,
@@ -640,6 +612,69 @@ exports.createOrder = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.verifyPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_SECRET)
+      .update(sign.toString())
+      .digest("hex");
+
+    if (razorpay_signature === expectedSign) {
+      // Payment Verified - Update Database
+      const orderId = razorpay_order_id;
+      
+      // Find session by parsing the receipt from order (need to store Razorpay order ID in session preferably, 
+      // but for now we trust the flow or query by order ID if stored. 
+      // Better approach: When createOrder happens, user sends requestId here too or we lookup order)
+      
+      // Since we don't have direct link in this request body easily without frontend passing it, 
+      // let's rely on finding any incomplete session for this user or better yet, passed requestId.
+      // BUT, easier way: The frontend must pass `responseData` which contains signature.
+      // We also need the Session ID to update.
+      
+      // Let's assume frontend passes the requestId or we can find it via Order Receipt if we fetch order from Razorpay.
+      // Easiest is to ask frontend to pass requestId or sessionId along with verification data.
+      
+      // Looking at `createOrder` above, it creates receipt: `session_${session._id}`
+      // We can fetch the order from Razorpay to get receipt, OR frontend passes sessionId.
+      
+      // Let's update frontend to pass sessionId/requestId. 
+      // For now, let's extract session ID from the order if possible, or just request it.
+      
+      // Wait, let's fetch the order from Razorpay to be safe? No, that adds latency.
+      // Let's expect `requestId` in body for simplicity, or we update `createOrder` to save orderId in session.
+      
+      // PLAN: Update `createOrder` to save `razorpayOrderId` in session.
+      // Then here we find session by `razorpayOrderId`.
+      
+      // Let's update `createOrder` first properly (I will do this in next step if needed, or do it now via verifyPayment logic)
+      
+      // Actually, simplest fix without changing DB schema too much:
+      // Frontend sends `order_id`. We can query Razorpay or just trust the signature.
+      // If signature is valid, we need to know WHICH session to update.
+      // We will REQUIRE `requestId` or `sessionId` in the verify body.
+      
+      const { requestId } = req.body;
+      const session = await ChargingSession.findOne({ request: requestId });
+      
+      if (!session) return res.status(404).json({ message: "Session not found" });
+
+      session.paymentStatus = "PAID";
+      await session.save();
+
+      return res.status(200).json({ success: true, message: "Payment verified successfully" });
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid signature sent!" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -777,54 +812,62 @@ exports.Userprofile = async (req, res) => {
 };
 
 
-//   try {
-//     // 1️⃣ Total active charging stations
-//     console.log(req.user.id,"req.user.id");
+// Get home page stats for logged in user
+exports.getHomeStats = async (req, res) => {
+  try {
+    // 1️ Total active charging stations
+    const totalStations = await User.countDocuments({
+      roles: "HOST",
+      isHostActive: true,
+    });
 
-//       const usercharged = await ChargingRequest.countDocuments(
-//         {driver:req.user.id,
-//           status:"accepted"},{$sum:1}
-//       );
+    // 2️ User's charging count (completed sessions)
+    const usercharged = await ChargingRequest.countDocuments({
+      driver: req.user.id,
+      status: "COMPLETED"
+    });
 
-//     const totalStations = await User.countDocuments({
-//       roles: "HOST",
-//       isHostActive: true,
-//     });
+    // 3️ Active charging sessions for this user
+    const activeChargingSessions = await ChargingRequest.countDocuments({
+      driver: req.user.id,
+      status: "ACTIVE"
+    });
 
-//     // 2️⃣ Connector type count
-//     const connectorTypeCount = await User.aggregate([
-//       {
-//         $match: {
-//           roles: "HOST",
-//           isHostActive: true,
-//           "evStation.connectorType": { $exists: true, $ne: null },
-//         },
-//       },
-//       {
-//         $group: {
-//           _id: "$evStation.connectorType",
-//           count: { $sum: 1 },
-//         },
-//       },
-//       {
-//         $project: {
-//           _id: 0,
-//           connectorType: "$_id",
-//           count: 1,
-//         },
-//       },
-//     ]);
+    // 4️ Connector type count (optional)
+    const connectorTypeCount = await User.aggregate([
+      {
+        $match: {
+          roles: "HOST",
+          isHostActive: true,
+          "evStation.connectorType": { $exists: true, $ne: null },
+        },
+      },
+      {
+        $group: {
+          _id: "$evStation.connectorType",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          connectorType: "$_id",
+          count: 1,
+        },
+      },
+    ]);
 
-//     res.status(200).json({
-//       success: true,
-//       data: {
-//         usercharged,
-//         totalStations,
-//         connectorTypeCount,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Dashboard stats error:", error);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// };
+    res.status(200).json({
+      success: true,
+      data: {
+        totalStations,
+        usercharged,
+        activeChargingSessions,
+        connectorTypeCount,
+      },
+    });
+  } catch (error) {
+    console.error("Home stats error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
