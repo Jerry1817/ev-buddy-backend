@@ -871,3 +871,59 @@ exports.getHomeStats = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * UPLOAD PROFILE IMAGE
+ */
+exports.uploadProfileImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Save relative path
+    const imagePath = `/uploads/${req.file.filename}`;
+    user.profileImage = imagePath;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile image uploaded successfully",
+      profileImage: imagePath,
+    });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ message: "Image upload failed" });
+  }
+};
+
+/**
+ * GET TRANSACTION HISTORY
+ * Returns all paid charging sessions for the logged-in user
+ */
+exports.getTransactionHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const transactions = await ChargingSession.find({
+      driver: userId,
+      paymentStatus: "PAID",
+      status: "COMPLETED",
+    })
+      .populate("host", "name evStation")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: transactions,
+    });
+  } catch (error) {
+    console.error("Get transaction history error:", error);
+    res.status(500).json({ message: "Failed to fetch transactions" });
+  }
+};

@@ -9,7 +9,8 @@ const {
   updateComplaintStatus,
   getAllTransactions,
   blockUser,
-  unblockUser
+  unblockUser,
+  getAnalytics
 } = require("../controllers/adminController");
 const { adminProtect } = require("../middleware/adminMiddleware");
 
@@ -27,5 +28,8 @@ router.get("/transactions", adminProtect, getAllTransactions);
 // Block/Unblock users and hosts
 router.put("/users/:id/block", adminProtect, blockUser);
 router.put("/users/:id/unblock", adminProtect, unblockUser);
+
+// Analytics
+router.get("/analytics", adminProtect, getAnalytics);
 
 module.exports = router;

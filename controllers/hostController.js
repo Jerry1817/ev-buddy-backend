@@ -2,6 +2,7 @@ const Station = require("../models/Station");
 const ChargingRequest = require("../models/ChargingRequest");
 const Chargingsession = require("../models/ChargingSession");
 const Review = require("../models/Review");
+const mongoose = require("mongoose");
 
 
 /**
@@ -314,3 +315,51 @@ exports.stopCharging = async (req, res) => {
 
 
 
+
+// ==========================================
+// 💰 EARNINGS CONTROLLER
+// ==========================================
+
+/**
+ * HOST → GET EARNINGS STATS
+ * Returns: Total Earnings, Recent Transactions (PAID sessions)
+ */
+exports.getEarningsStats = async (req, res) => {
+  try {
+    const hostId = req.user.id;
+
+    // 1. Calculate Total Revenue (Sum of ALL PAID sessions)
+    const revenueResult = await Chargingsession.aggregate([
+      { 
+        $match: { 
+          host: new mongoose.Types.ObjectId(hostId), 
+          paymentStatus: "PAID",
+          status: "COMPLETED"
+        } 
+      },
+      { $group: { _id: null, total: { $sum: "$totalCost" } } }
+    ]);
+    const totalEarnings = revenueResult.length > 0 ? revenueResult[0].total : 0;
+
+    // 2. Fetch Recent Transactions (PAID sessions)
+    const transactions = await Chargingsession.find({
+      host: hostId,
+      paymentStatus: "PAID",
+      status: "COMPLETED"
+    })
+    .populate("driver", "name email phone")
+    .sort({ createdAt: -1 })
+    .limit(10); // Last 10 transactions
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalEarnings,
+        transactions
+      },
+    });
+  } catch (error) {
+    console.error("Get earnings stats error:", error);
+    res.status(500).json({ message: "Failed to fetch earnings stats" });
+  }
+};

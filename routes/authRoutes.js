@@ -1,6 +1,6 @@
 const express = require("express");
 const {protect}=require('../middleware/authMiddleware')
-const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, Arrivedrequest, verifyPayment, startSessioncharging, endSession, createOrder, getDashboardStats, addReview, addComplaint, Userprofile, verifyOtp, resendOtp, getHomeStats } = require("../controllers/authController");
+const { register, login, getProfile, becomeHost, AddLocation, getMyChargingRequests, Arrivedrequest, verifyPayment, startSessioncharging, endSession, createOrder, addReview, addComplaint, getHomeStats, uploadProfileImage, verifyOtp, resendOtp, Userprofile, getTransactionHistory } = require("../controllers/authController");
 const upload = require("../middleware/upload.Middleware");
 const router = express.Router();
 
@@ -21,8 +21,13 @@ router.post('/payment/verify',protect,verifyPayment)
 router.post('/addreview',protect,addReview)
 router.post('/complaint',protect,upload.array("images", 5),addComplaint)
 router.get('/me',protect,Userprofile)
-router.get('/homestats',protect,getHomeStats)
+// Initial home data (banner, stats)
+router.get("/homestats", protect, getHomeStats);
+
+// Profile Upload
+router.post("/upload-avatar", protect, upload.single("image"), uploadProfileImage);
+
+// Transaction History
+router.get("/transactions", protect, getTransactionHistory);
 
 module.exports = router;
-
-

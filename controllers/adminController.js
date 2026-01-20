@@ -270,3 +270,75 @@ exports.unblockUser = async (req, res) => {
   }
 };
 
+
+/**
+ * GET ANALYTICS
+ * Returns platform analytics: stats, usage trends, popular stations
+ */
+exports.getAnalytics = async (req, res) => {
+  try {
+    // 1. Overall Stats
+    const totalUsers = await User.countDocuments({ roles: "DRIVER" });
+    const totalHosts = await User.countDocuments({ roles: "HOST" });
+    const totalSessions = await ChargingSession.countDocuments({ status: "COMPLETED" });
+
+    const revenueResult = await ChargingSession.aggregate([
+      { $match: { paymentStatus: "PAID" } },
+      { $group: { _id: null, total: { $sum: "$totalCost" } } }
+    ]);
+    const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
+
+    // 2. Daily Sessions (Last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const dailySessions = await ChargingSession.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo }, status: "COMPLETED" } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // 3. Top 5 Popular Stations (by session count)
+    const popularStations = await ChargingSession.aggregate([
+      { $match: { status: "COMPLETED" } },
+      { $group: { _id: "$host", sessionCount: { $sum: 1 } } },
+      { $sort: { sessionCount: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "hostInfo",
+        },
+      },
+      { $unwind: "$hostInfo" },
+      {
+        $project: {
+          _id: 0,
+          hostId: "$_id",
+          hostName: "$hostInfo.name",
+          stationName: "$hostInfo.evStation.name",
+          sessionCount: 1,
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stats: { totalUsers, totalHosts, totalSessions, totalRevenue },
+        dailySessions,
+        popularStations,
+      },
+    });
+  } catch (error) {
+    console.error("Get analytics error:", error);
+    res.status(500).json({ message: "Failed to fetch analytics" });
+  }
+};
