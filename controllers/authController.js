@@ -392,14 +392,14 @@ const isExpired = (createdAt) => {
 // userside
 exports.getMyChargingRequests = async (req, res) => {
   try {
-    // 1️⃣ Fetch user requests (latest first)
+    // 1️ Fetch user requests (latest first)
     const requests = await ChargingRequest.find({
       driver: req.user.id,
     })
       .populate("host", "name evStation")
       .sort({ createdAt: -1 });
 
-    // 2️⃣ Auto-reject expired pending requests
+    // 2️ Auto-reject expired pending requests
     for (const reqItem of requests) {
       if (reqItem.status === "pending" && isExpired(reqItem.createdAt)) {
         reqItem.status = "rejected";
@@ -407,7 +407,7 @@ exports.getMyChargingRequests = async (req, res) => {
       }
     }
 
-    // 3️⃣ Get charging sessions for these requests
+    // 3️ Get charging sessions for these requests
     const requestIds = requests.map((r) => r._id);
 
     const sessions = await ChargingSession.find({
@@ -415,13 +415,13 @@ exports.getMyChargingRequests = async (req, res) => {
       driver: req.user.id,
     });
 
-    // 4️⃣ Map sessions by request ID
+    // 4️ Map sessions by request ID
     const sessionMap = {};
     sessions.forEach((session) => {
       sessionMap[session.request.toString()] = session;
     });
 
-    // 5️⃣ Merge session info into requests
+    // 5️ Merge session info into requests
     const formattedRequests = requests.map((reqItem) => {
       const session = sessionMap[reqItem._id.toString()];
 
@@ -429,6 +429,13 @@ exports.getMyChargingRequests = async (req, res) => {
         ...reqItem.toObject(),
         chargingStatus: session?.status || null,
         paymentStatus: session?.paymentStatus || null,
+        totalCost: session?.totalCost || 0,
+        duration: session?.durationInMinutes || 0,
+        totalDuration: session?.durationInMinutes || 0,
+        durationInMinutes: session?.durationInMinutes || 0,
+        energyConsumed: session?.energyConsumed || 0,
+        pricePerUnit: session?.pricePerUnit || 0,
+        chargingPricePerUnit: session?.pricePerUnit || 0,
       };
     });
 
@@ -551,11 +558,17 @@ exports.endSession = async (req, res) => {
 
     const host = await User.findById(session.host);
 
-    const pricePerMinute = host.chargingPricePerUnit || 5;
+    const pricePerMinute = host.evStation?.chargingPricePerUnit || 5;
     const totalCost = durationInMinutes * pricePerMinute;
+
+    // Simulate energy consumed based on duration
+    const powerKW = host.evStation?.power || 30;
+    const energyConsumed = (durationInMinutes / 60) * powerKW;
 
     session.durationInMinutes = durationInMinutes;
     session.totalCost = totalCost;
+    session.pricePerUnit = pricePerMinute;
+    session.energyConsumed = energyConsumed;
     session.status = "COMPLETED";
 
     await session.save();
@@ -566,7 +579,11 @@ exports.endSession = async (req, res) => {
       data: {
         sessionId: session._id,
         durationInMinutes,
+        totalDuration: durationInMinutes,
         totalCost,
+        pricePerUnit: pricePerMinute,
+        chargingPricePerUnit: pricePerMinute,
+        energyConsumed,
       },
     });
   } catch (err) {
